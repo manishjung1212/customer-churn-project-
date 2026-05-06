@@ -1,0 +1,95 @@
+f['Churn'] = df['Churn'].replace({"yes":1,"no":0})
+df.head(5)
+object_cols = df.select_dtypes(include="object").columns
+object_cols
+encoders = {}
+
+for column in object_cols:
+    if column == "Churn":
+        continue 
+    
+    le = LabelEncoder()
+    df[column] = le.fit_transform(df[column])
+    encoders[column] = le
+x = df.drop(columns=['Churn'])
+y = df['Churn']
+x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=0.2,random_state= 42)
+smote = SMOTE(random_state=42)
+x_train_smote,y_train_smote = smote.fit_resample(x_train,y_train) 
+print(y_train_smote.shape)
+print(y_train_smote.value_counts())
+models = {
+    'Decision tree' : DecisionTreeClassifier(random_state=42),
+    'random forest' : RandomForestClassifier(random_state=42),
+    'XGB' : XGBClassifier(random_state=42)
+}
+cv_scores = {}
+
+for model_name, model in models.items():
+    print(f"training {model_name} with default parameters")
+    
+    scores = cross_val_score(model, x_train_smote, y_train_smote, cv=5, scoring='accuracy')
+    
+    cv_scores[model_name] = scores
+    
+    print(f"{model_name} = cross validated accuracy : {np.mean(scores):.4f}")
+    print("."*50)
+rfc = RandomForestClassifier(random_state=42)
+model.fit(x_train, y_train)
+
+
+model.fit(x_train_smote, y_train_smote)
+y_test_pred = model.predict(x_test)
+
+print("Accuracy score:\n", accuracy_score(y_test, y_test_pred))
+print("Confusion matrix:\n", confusion_matrix(y_test, y_test_pred))
+print("Classification report:\n", classification_report(y_test, y_test_pred))
+model_data = {"model":rfc , "features_names": x.columns.tolist()}
+
+with open("Customer churn_model.pkl", "wb") as f:
+    pickle.dump(model_data, f)
+with open("customer churn_model.pkl", "rb") as f:
+    model_data = pickle.load(f)
+
+loaded_model = model_data["model"]
+feature_names = model_data["features_names"]
+input_data = {
+    'gender': 'Male',
+    'SeniorCitizen': 1,
+    'Partner': 'No',
+    'Dependents': 'Yes',
+    'tenure': 1,
+    'PhoneService': 'No',
+    'MultipleLines': 'No phone service',
+    'InternetService': 'DSL',
+    'OnlineSecurity': 'No',
+    'OnlineBackup': 'Yes',
+    'DeviceProtection': 'No',
+    'TechSupport': 'Yes',
+    'StreamingTV': 'No',
+    'StreamingMovies': 'No',
+    'Contract': 'Month-to-month',
+    'PaperlessBilling': 'Yes',
+    'PaymentMethod': 'Electronic check',
+    'MonthlyCharges': 29.85,
+    'TotalCharges': 29.85
+}
+
+input_data_df = pd.DataFrame([input_data])
+with open("encoder.pkl","rb") as f:
+    encoders = pickle.load(f)
+print(input_data_df.head(5))
+if "Churn" in encoders:
+    del encoders["Churn"]
+for column,encoder in encoders.items():
+    input_data_df[column] = encoder.transform(input_data_df[column])
+prediction =loaded_model.predict(input_data_df)
+pred_prob = loaded_model.predict_proba(input_data_df)
+
+
+
+
+
+
+
+
